@@ -1,0 +1,358 @@
+from array import *
+import numpy as np
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from string import ascii_uppercase
+from scipy.optimize import curve_fit
+from sklearn.metrics import r2_score 
+
+
+path = r"\\ad.monash.edu\home\User001\bzha0080\Desktop\Monash\02. ongoing project\09. ROP\UsefulData\5. Useful data -final data\3D-fitting data\CRS\20C\0.7M\original_data.txt"
+path_t = r"\\ad.monash.edu\home\User001\bzha0080\Desktop\Monash\02. ongoing project\09. ROP\UsefulData\5. Useful data -final data\3D-fitting data\CRS\20C\0.7M"
+filename =  os.path.splitext(os.path.split(path)[1])[0]
+rawdata = np.loadtxt(path) 
+print(rawdata.shape)
+
+
+Vreactor = 1 # the volume of reactor is 1 ml
+C_Monomer = 6 #float(input('\033[1;31mPlease input the initial concentration of your Monomer(M):>> \033[0m'))
+C_RaftAgent = 0.5 #float(input('\033[1;31mPlease input the initial concentration of your RaftAgent (M):>> \033[0m'))
+C_Initiator = 0.05 #float(input('\033[1;31mPlease input the initial concentration of your initiator (M):>> \033[0m'))
+
+M_polymer = 0.5 # the molar of monomer needed
+DesiredMn = 8000 # the desired molecular weight of polymer
+targetconversion = DesiredMn/144.126
+
+
+Ori_CRS = []
+Ori_Residencetime = []
+Ori_Conversion = []
+
+# print(len(rawdata[0]))
+
+for i in range(21):
+     for j in range(10):
+        ConversionList = rawdata[i]
+        
+        catalystratio = 200 + i *50
+        residencetime = j + 1
+        conversion = ConversionList[j]
+
+        Ori_CRS.append(catalystratio)
+        Ori_Residencetime.append(residencetime)
+        Ori_Conversion.append(conversion)
+           
+        
+
+# save converison varies from time data to csv file
+with open(r'{}\{}-rawData.csv'.format(path_t, filename), 'w') as f:
+    pass 
+data = {
+        'Catalystratio':Ori_CRS,
+        'Residence time/minute':Ori_Residencetime,
+        'Conversion/%':Ori_Conversion,
+      
+}
+        
+column_names = ['Catalystratio','Residence time/minute','Conversion/%']
+
+df = pd.DataFrame(data, columns = column_names) #columns = column_names
+df.to_csv(r'{}\{}-rawData.csv'.format(path_t,filename), columns = column_names) 
+
+
+# 3-D surface fitting 
+X = np.array(Ori_CRS); Y = np.array(Ori_Residencetime); Z = np.array(Ori_Conversion)
+data = np.c_[X,Y,Z]
+
+def func(X, A, B, C, D, E, F, G, H, I, J):
+    """
+    X is crs; Y is Residence time; Z is Conversion
+    """
+    x,y,Z = X.T 
+    return (A*x**3 + B*y**3 + C*x*y**2 + D*y*x**2 + E*x**2 + F*y**2 + G*x*y + H*x + I*y + J)
+
+popt, _ = curve_fit(func, data, data[:,2])
+
+coefficient = []
+for i, j in zip(popt, ascii_uppercase):
+    print(f"{j} = {i:.3f}")
+    coefficient.append(i)
+
+
+A = float(coefficient[0]); B = float(coefficient[1]); C = float(coefficient[2]); D = float(coefficient[3]); E = float(coefficient[4]); F = float(coefficient[5]); G = float(coefficient[6])
+H = float(coefficient[7]); I = float(coefficient[8]); J = float(coefficient[9])
+print(A)
+
+# print(coefficient)
+Zdata = A*X**3 + B*Y**3 + C*X*Y**2 + D*Y*X**2 + E*X**2 + F*Y**2 + G*X*Y + H*X + I*Y + J
+R_squared = r2_score(Z, Zdata)
+print(f'the R_squared value of 3 dimensional surface plot fitting is {R_squared}')
+
+
+fig = plt.figure(figsize=plt.figaspect(0.5))
+ax = fig.add_subplot(1,2,1, projection='3d')
+ax.scatter(X, Y, Z, c='r')
+ax.set_xlabel('Catalystratio')
+ax.set_ylabel('Residence time (minute)')
+ax.set_zlabel('Conversion (%)')
+ax.set_title('Original Plot')
+
+X, Y = np.meshgrid(X, Y)
+zdata = A*X**3 + B*Y**3 + C*X*Y**2 + D*Y*X**2 + E*X**2 + F*Y**2 + G*X*Y + H*X + I*Y + J
+ax = fig.add_subplot(1,2,2, projection='3d')
+surf = ax.plot_surface(X, Y, zdata, cmap = plt.cm.rainbow, linewidth=0, antialiased=False, rcount=100, ccount=100)
+# ax.scatter(1.5,9,73.8, c = 'y', s = 30)  #checking point
+ax.set_xlabel('Catalystratio')
+ax.set_ylabel('Residence time (minute)')
+ax.set_zlabel('Conversion (%)')
+ax.set_title('Fitting Plot')
+plt.savefig(f'{path_t}/{filename}')
+
+
+############# Reaction Study
+"""
+Calculate the reaction rate only chose 16 data point in the concentration range(0.5:5), and for each concentration only chose 19 different residence time data points.
+"""
+def func (X:float,Y:float)->float:
+    '''
+    X: Concentration of monomer, unit: M; Y Residence time of reaction,unit:minute
+    ''' 
+    return(A*X**3 + B*Y**3 + C*X*Y**2 + D*Y*X**2 + E*X**2 + F*Y**2 + G*X*Y + H*X + I*Y + J)
+
+# result = func(1.5,9)
+# print(f'result is {result}')
+
+kobsCRS = []
+Kt = []
+R2= []
+kobsMonomercon = []
+KobsLne = []
+KobsResidencetime= []
+
+for i in range(21):
+
+    kobsCR = 200 + i*50 
+    kobsCRS.append(kobsCR)
+    KobsResidence= []
+    Lne = []
+    KobsResidence.append(0)
+    Lne.append(0)
+
+    kobsMonomercon.append(kobsCR);KobsResidencetime.append(0);KobsLne.append(0)
+
+    for j in range(1,11):
+        
+        kobsMonomercon.append(kobsCR)
+        kobsresidencetime = j
+        # print(kobsresidencetime)
+        KobsResidencetime.append(kobsresidencetime)
+        KobsResidence.append(kobsresidencetime)
+        kobsconversion = func(kobsCR,kobsresidencetime)
+        # print(kobsconversion)
+        #Conversion.append(conversion)
+        A0 = 0.5 * (100-kobsconversion)/100
+        # print(f'Ao is {A0}')
+        #print(A0)
+        lne = np.log(abs(A0)/0.5)
+        # print(f'lne is {lne}')
+        #print(lne)
+        Lne.append(lne)
+        KobsLne.append(lne)
+
+        with open(r'{}\{}-kobs-originalData.csv'.format(path_t, filename), 'w') as f:
+            pass 
+
+        data = {
+                'catalystratio':kobsMonomercon,
+                'Residencetime':KobsResidencetime,
+                'lne':KobsLne,
+        }
+                
+        column_names = ['catalystratio','Residencetime','lne']
+
+        df = pd.DataFrame(data, columns = column_names) #columns = column_names
+        df.to_csv(r'{}\{}-kobs-originalData.csv'.format(path_t,filename), columns = column_names)    
+
+
+    KobsResidence = np.array(KobsResidence)
+    KobsResidence = KobsResidence[:,np.newaxis]
+    a, _, _, _ = np.linalg.lstsq(KobsResidence, Lne, rcond=None)
+    Ratecoefficient = abs(a[0])
+    Kt.append(Ratecoefficient)
+    data = a * KobsResidence
+    
+    R_squared = r2_score(Lne, data)
+    R2.append(R_squared)
+    # print(R_squared)
+
+    # plt.scatter(KobsResidence, Lne, color = 'r')
+    # plt.plot(KobsResidence, data, color = 'b')
+    # plt.xlabel('residencetime /minute')
+    # plt.ylabel('ln(M/MO)')
+    # plt.savefig(f'{path_t}/{C_Monomer}.png')
+    # plt.close()
+
+
+
+# save converison varies from time data to csv file
+
+with open(r'{}\{}-kobs-Data.csv'.format(path_t, filename), 'w') as f:
+    pass 
+data = {
+        'catalystratio':kobsCRS,
+        'Reactionrate':Kt,
+        'R2 value':R2,
+}
+        
+column_names = ['catalystratio','Reactionrate','R2 value']
+
+df = pd.DataFrame(data, columns = column_names) #columns = column_names
+df.to_csv(r'{}\{}-kobs-Data.csv'.format(path_t,filename), columns = column_names)
+       
+
+######## Reaction conditions for Desired polymer  
+
+# def Calresidue(targetconversion,X,Y)->float:
+#     '''
+#     Explanation: this function is used to calculate the residence time
+#     '''
+#     residue = abs(targetconversion-(A*X**3 + B*Y**3 + C*X*Y**2 + D*Y*X**2 + E*X**2 + F*Y**2 + G*X*Y + H*X + I*Y + J))
+
+#     return(residue)
+
+# Polymercon = []
+# TotalFlowrate = []
+# Timecomsumed = []
+# FlowMonomer = []; FlowRaft = []; FlowSolvent = []
+# VolumeMonomer = []; VolumeRaft = []; VolumeSolvent = []
+# Money = []
+# Efactor = []
+# GotResidencetime = []
+# GotConversion = []
+# GotMonomer = []
+# conresi = []
+
+# for j in range(31):
+#     gotconcentration = 0.2 + j* 0.02
+
+#     for i in range(10):
+
+#         time = i
+#         left = Calresidue(targetconversion, gotconcentration, time)
+
+#         if  left <= 0.5: 
+#             GotMonomer.append(gotconcentration)
+#             gotresidencetime = time
+            
+#             gotconversion = func(gotconcentration,gotresidencetime) 
+#             GotConversion.append(gotconversion)
+
+#             flowrate = Vreactor/gotresidencetime     
+#             FRmonomer = gotconcentration * flowrate / C_Monomer
+            
+
+#             FRraft = FRmonomer * C_Monomer / (100 * C_RaftAgent)
+#             FRSolvent = flowrate - FRmonomer - FRraft 
+
+#             FlowMonomer.append(FRmonomer); FlowRaft.append(FRraft); FlowSolvent.append(FRSolvent)
+#             polymercon = (gotconcentration * flowrate / 1000) * targetconversion/100 / ((DesiredMn - 350)/86.09)
+#             Polymercon.append(polymercon)
+#             Time_need = M_polymer/polymercon + 2
+#             # print(Time_need)
+#             Timecomsumed.append(Time_need)
+#             volumeMonomer = Time_need * FRmonomer
+#             volumeRaft = FRraft * Time_need
+#             volumeSolvent = FRSolvent * Time_need
+#             VolumeMonomer.append(volumeMonomer); VolumeRaft.append(volumeRaft); VolumeSolvent.append(volumeSolvent)
+#             MoneyConsumed = volumeMonomer* 0.032 + volumeRaft * 0.126 + volumeSolvent * 0.0312 
+#             efactor = (volumeMonomer * 1 + volumeSolvent * 1.1 + volumeRaft *0.94137  - DesiredMn*M_polymer)/(DesiredMn*M_polymer)     
+#             Efactor.append(efactor)
+#             Money.append(MoneyConsumed)
+#             GotResidencetime.append(gotresidencetime)
+#             TotalFlowrate.append(flowrate)
+#         else:
+#             pass
+
+# # save converison vaeries from time data to csv file
+# with open(r'{}\{}-calculation-Data.csv'.format(path_t, filename), 'w') as f:
+#     pass 
+# data = {
+#         'Monomerconcentration/M':GotMonomer,
+#         'Conversion/%':GotConversion,
+#         'Residence time/minute':GotResidencetime,
+#         'Polymerconcentration/ M/min':Polymercon,
+#         'TotalFlowrate/ ml/min':TotalFlowrate,
+#         'Timeconsumed/min':Timecomsumed,
+#         'FlowMonomer/ml/min':FlowMonomer, 'FlowRaft/ ml/min':FlowRaft, 'FlowSolvent/ ml/min': FlowSolvent, 
+#         'VolumeMonomer/ ml':VolumeMonomer,'VolumerRaft/ ml':VolumeRaft, 'VolumeSolvent/ ml':VolumeSolvent,
+#         'Money/$':Money,
+#         'efactor':Efactor
+# }
+        
+# # print(len(GotMonomer))
+# # print(len(GotResidencetime))
+# # print(len(Polymercon))
+# # print(len(TotalFlowrate))
+# # print(len(Timecomsumed))
+# # print(len(FlowMonomer))
+# # print(len(VolumeMonomer))
+# # print(len(Money))
+# # print(len(Efactor))
+
+
+
+
+# column_names = ['Monomerconcentration/M','Conversion/%','Residence time/minute','Polymerconcentration/ M/min','TotalFlowrate/ ml/min','Timeconsumed/min',
+#                 'FlowMonomer/ml/min', 'FlowRaft/ ml/min', 'FlowSolvent/ ml/min','VolumeMonomer/ ml', 'VolumerRaft/ ml', 'VolumeSolvent/ ml','Money/$','efactor'
+#                ]
+
+# df = pd.DataFrame(data, columns = column_names) #columns = column_names
+# df.to_csv(r'{}\{}-calculation-Data.csv'.format(path_t,filename), columns = column_names)   
+
+
+        
+with open(r'{}\{}-Data.csv'.format(path_t, filename), 'w') as f:
+            pass 
+
+data = {
+        'C':Ori_CRS,
+        'T':Ori_Residencetime,
+        'CONVERSION':Zdata,
+}
+                
+column_names = ['C','T','CONVERSION']
+
+df = pd.DataFrame(data, columns = column_names) #columns = column_names
+df.to_csv(r'{}\{}-Data.csv'.format(path_t,filename), columns = column_names) 
+
+
+T_concentration = []
+T_residencetime = []
+T_Conversion = []
+time = [1,2,3,4,5,6,7,8,9,10]
+
+for j in time:
+    for i in range(21):
+        con = 200 + i*50
+        therotical_conversion = func(con,j)
+        if therotical_conversion < 0:
+             conversion = 0
+        else:
+             conversion = therotical_conversion
+        T_concentration.append(con);T_residencetime.append(j);T_Conversion.append(conversion)
+
+with open(r'{}\{}-therotical_conversion_Data.csv'.format(path_t, filename), 'w') as f:
+            pass 
+
+data = {
+        'C':T_concentration,
+        'T':T_residencetime,
+        'CONVERSION':T_Conversion,
+}
+                
+column_names = ['C','T','CONVERSION']
+
+df = pd.DataFrame(data, columns = column_names) #columns = column_names
+df.to_csv(r'{}\{}-therotical_conversion_Data.csv'.format(path_t,filename), columns = column_names) 
+

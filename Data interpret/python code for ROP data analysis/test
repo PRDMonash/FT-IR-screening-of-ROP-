@@ -1,0 +1,34 @@
+import os 
+import torch
+import numpy as np
+import plotly
+
+result = []
+def target(list):
+    for x in list:
+        result.append(np.exp(-(x[0]-2)**2)+np.exp(-(x[0]-6)**2/10) + 1/(x[0]**2+1))
+        # print(result)
+        return torch.tensor(result),result
+
+    
+import plotly.graph_objects as go 
+
+x = np.linspace (-2.,10.,100)
+x_new = x.reshape((100,-1))
+print(x_new)
+# z = target(x_new)[1]
+z = result
+#z=z.cpu().detach().numpy()
+# # z=z.numpy()
+print(z)
+
+# list = []
+# for i in z:
+#     list.append(i)
+# #print(list)
+ 
+
+data = go.scatter(x = x, y =z, line_color = "#FE73FF")
+fig = go.Figure(data = data)
+fig.update_layout(title = "example", xaxis_tittle = "input", yaxis_tittle = "output")
+fig.show()
